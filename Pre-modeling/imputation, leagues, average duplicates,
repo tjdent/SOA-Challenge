@@ -1,0 +1,86 @@
+## combine players who play the same position into a common data frame, e.g. fw_league contains Forward players 
+league_nonGK <- cbind(league_shooting[,1:24], league_passing[,7:24], league_defence[,7:32])
+league_nonGK$Pos1 <- substring(league_nonGK$Pos,1,2)
+league_nonGK$Pos2 <- substring(league_nonGK$Pos,3,4)
+n <- ncol(league_nonGK)
+
+FW_league <- league_nonGK[league_nonGK$Pos1 == "FW" | league_nonGK$Pos2 == "FW", 1:(n-2)]
+DF_league <- league_nonGK[league_nonGK$Pos1 == "DF" | league_nonGK$Pos2 == "DF",1:(n-2)]
+MF_league <- league_nonGK[league_nonGK$Pos1 == "MF" | league_nonGK$Pos2 == "MF",1:(n-2)]
+GK_league <- cbind(league_nonGK[league_nonGK$Pos1 == "GK" | league_nonGK$Pos2 == "GK",1:(n-4)], 
+                   league_gk[,7:ncol(league_gk)])
+write.csv(FW_league, 'fw_league.csv')
+write.csv(DF_league, 'df_league.csv')
+write.csv(MF_league, 'mf_league.csv')
+write.csv(GK_league, 'gk_league.csv')
+
+
+fw_league <- read.csv("fw_league.csv")
+df_league <- read.csv("df_league.csv")
+gk_league <- read.csv("gk_league.csv")
+mf_league <- read.csv("mf_league.csv")
+
+#impute data for forwards using MICE package
+imputed_data <- mice(fw_league[,8:(ncol(fw_league)-2)])
+imputed_data <-complete(imputed_data)
+complete(imputed_data)
+fw_league_imputed <- cbind(fw_league[,1:7], imputed_data, fw_league[,(ncol(fw_league)-1):ncol(fw_league)])
+fw_league <- fw_league_imputed
+
+
+
+# this function converts the league of players to numeric (League A --> 1, etc.)
+league2numeric <- function(data) {
+  for (i in 1:length(data$League)) {
+    if (data$League[i] == "A") {
+      data$League[i] <- 1
+    }
+    if (data$League[i] == "B") {
+      data$League[i] <- 2
+    }
+    if (data$League[i] == "C") {
+      data$League[i] <- 3
+    }
+    if (data$League[i] == "D") {
+      data$League[i] <- 4
+    }
+    if (data$League[i] == "E") {
+      data$League[i] <- 5
+    }
+    if (data$League[i] == "RFL") {
+      data$League[i] <- 6
+    }
+  }
+  data$League<- as.numeric(data$League)
+  return(data)
+}
+fw_league <- league2numeric(fw_league)
+df_league <- league2numeric(df_league)
+gk_league <- league2numeric(gk_league)
+mf_league <- league2numeric(mf_league)
+
+
+#This code averages the stats of duplicate players 
+duplicate_player <- duplicated(fw_league$Player)
+duplicate_rows <- which(duplicate_player == TRUE)
+for (i in duplicate_rows) {
+  rows_of_player <- which(fw_league$Player == fw_league$Player[i])
+  player_stats <- fw_league[rows_of_player,]
+  teams_played_for <- nrow(player_stats) #number of teams the player plays for
+  average_player_stats <- player_stats[1,]
+  average_player_stats$Squad <- paste(player_stats$Squad, collapse = ", ")
+  
+  player_stats_pos1 <- substring(player_stats$Pos,1,2) #find all first positions played 
+  player_stats_pos2 <- substring(player_stats$Pos,3,4) #find all second positions played
+  all_player_positions <- union(player_stats_pos1, player_stats_pos2)
+  average_player_stats$Pos <- paste(all_player_positions, collapse = "") # paste all positions played by the player across all their teams
+  
+  average_player_stats[8:length(average_player_stats)] <- colMeans(as.numeric(player_stats[,8:length(player_stats)]))
+  average_player_stats$Year <- paste(unique(player_stats$Year), collapse = ", ")
+  
+  fw_league[rows_of_player[1],] <- average_player_stats #replace first instance of players name with the average of their stats 
+  remove_these_rows <- rows_of_player[seq(from=2)]
+  fw_league <- fw_league[-remove_these_rows,]
+
+}
+

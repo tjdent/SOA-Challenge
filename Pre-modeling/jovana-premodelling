@@ -1,3 +1,10 @@
+#imputation using Mice
+#converts leagues to numeric
+#averages duplicates of players player across multiple teams 
+
+###------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
 ## combine players who play the same position into a common data frame, e.g. fw_league contains Forward players 
 league_nonGK <- cbind(league_shooting[,1:24], league_passing[,7:24], league_defence[,7:32])
 league_nonGK$Pos1 <- substring(league_nonGK$Pos,1,2)
@@ -20,6 +27,8 @@ df_league <- read.csv("df_league.csv")
 gk_league <- read.csv("gk_league.csv")
 mf_league <- read.csv("mf_league.csv")
 
+###------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
 #impute data for forwards using MICE package
 imputed_data <- mice(fw_league[,8:(ncol(fw_league)-2)])
 imputed_data <-complete(imputed_data)
@@ -27,7 +36,7 @@ complete(imputed_data)
 fw_league_imputed <- cbind(fw_league[,1:7], imputed_data, fw_league[,(ncol(fw_league)-1):ncol(fw_league)])
 fw_league <- fw_league_imputed
 
-
+###------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # this function converts the league of players to numeric (League A --> 1, etc.)
 league2numeric <- function(data) {
@@ -59,6 +68,7 @@ df_league <- league2numeric(df_league)
 gk_league <- league2numeric(gk_league)
 mf_league <- league2numeric(mf_league)
 
+###------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 #This code averages the stats of duplicate players 
 duplicate_player <- duplicated(fw_league$Player)

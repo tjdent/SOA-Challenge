@@ -1,0 +1,64 @@
+##Initial set up of workspace
+setwd("~/Working Directory/SOA-Challenge-main/Data")
+library(data.table)
+
+##Loading in data
+#Just loads in the datasets with their names
+temp = list.files(pattern="*.csv")
+for( i in 1:length(temp)){
+  assign(temp[i], fread(temp[i]), envir = .GlobalEnv )
+}
+
+
+##Normalise and avg data
+#Filtering to 2021
+data2021_def <- tournament_defense.csv[ Year == '2021',]
+data2021_gk <- tournament_goalkeeping.csv[ Year == '2021',]
+data2021_pass <- tournament_passing.csv[ Year == '2021',]
+data2021_shoot <- tournament_shooting.csv[ Year == '2021',]
+
+##Normalising the data
+normalise <- function(dataset,type){
+  classes <- lapply(dataset, class)
+  for(i in 1:ncol(dataset)){
+    if(classes[i] == "numeric"){
+      col <- dataset[ , ..i]
+      col_norm <- scale(col)
+      dataset[, i] <- col_norm
+    }
+  }
+  assign(paste0("norm",type), dataset, envir = .GlobalEnv)
+}
+
+norm_def <- normalise(data2021_def,"def")
+norm_shoot <- normalise(data2021_shoot,"shoot")
+norm_pass <- normalise(data2021_pass,"pass")
+norm_gk <- normalise(data2021_gk,"gk")
+
+##Averaging the data by country
+avg_stat <- function(dataset,type){
+  classes <- lapply(dataset, class)
+  cols <- classes=="numeric"
+  vec <-names(dataset[,..cols])
+  stat_avg <- dataset[, lapply(.SD, mean), by=Nation, .SDcols=vec] 
+  assign(paste0("stat_avg_",type),stat_avg, envir=.GlobalEnv)
+}
+avg_stat(norm_def,"def")
+avg_stat(norm_shoot,"shoot")
+avg_stat(norm_pass,"pass")
+avg_stat(norm_gk,"gk")
+
+##Making a master dataset
+#The 90s stats seem strange, they're different passed on stat type
+stat_avg_master <- merge(stat_avg_def, stat_avg_shoot, by="Nation", all.data=TRUE)
+stat_avg_master <- merge(stat_avg_master, stat_avg_pass, by="Nation", all.data=TRUE)
+stat_avg_master <- merge(stat_avg_master, stat_avg_gk, by="Nation", all.data=TRUE)
+
+#Quick clean up
+stat_avg_master[,Age:=NULL]
+stat_avg_master[,`90s.x`:=NULL]
+stat_avg_master[,`90s.y`:=NULL]
+stat_avg_master[,`90s`:=NULL]
+
+#Final output
+stat_avg_master
